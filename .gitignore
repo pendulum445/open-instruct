@@ -7,6 +7,8 @@ rejection_sampling/shards1
 token_length.png
 *.tfevents.*
 
+oe-eval-internal/
+
 results
 models
 wandb

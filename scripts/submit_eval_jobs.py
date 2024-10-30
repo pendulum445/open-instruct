@@ -15,7 +15,7 @@ import os
 def adjust_batch_size(task_spec, model_name, batch_size_reduction):
     "Adjust batch size using heuristics that are good for A100-size GPUs."
     reduce_by_2 = ["13B"]
-    reduce_by_4 = ["30B", "34B", "40B", "65B", "70B"]
+    reduce_by_4 = ["30B", "34B", "40B", "65B", "70B", "70b", "72B", "72b"]
     # If not given, choose a value based on the model name.
     if batch_size_reduction is None:
         if any([pattern in model_name for pattern in reduce_by_2]):
@@ -37,7 +37,7 @@ def adjust_batch_size(task_spec, model_name, batch_size_reduction):
 def adjust_gpus(task_spec, experiment_group, model_name, gpu_multiplier):
     "Adjust GPU count using heuristics that are good for A100-size GPUs."
     medium = ["30B", "34B"]
-    large = ["40B", "65B", "70B"]
+    large = ["40B", "65B", "70B", "70b", "72B", "72b"]
     # If not given, choose a value based on model name. 
     if gpu_multiplier is None:
         if any([pattern in model_name for pattern in medium]):
@@ -73,9 +73,18 @@ parser.add_argument("--workspace", type=str, default="oe-adapt-general")
 parser.add_argument("--model_name", type=str, default="hf-opt-7B")
 parser.add_argument("--hf_revision", type=str, default=None)
 parser.add_argument("--location", type=str, default=None)
-parser.add_argument("--beaker_image", type=str, default="hamishivi/open-instruct-eval", help="If given, use this Beaker image.")
+parser.add_argument("--beaker_image", type=str, default="nathanl/open_instruct_auto", help="If given, use this Beaker image.")
 parser.add_argument("--beaker_subfolder", type=str, default=None)
-parser.add_argument("--cluster", nargs='+', default=["ai2/allennlp-cirrascale", "ai2/general-cirrascale", "ai2/mosaic-cirrascale-a100", "ai2/s2-cirrascale-l40", "ai2/jupiter-cirrascale-2"])
+parser.add_argument("--cluster", nargs='+', default=[
+    "ai2/allennlp-cirrascale",
+    "ai2/general-cirrascale",
+    "ai2/s2-cirrascale-l40",
+    "ai2/allennlp-elara-cirrascale",
+    "ai2/pluto-cirrascale",
+    "ai2/neptune-cirrascale",
+    "ai2/saturn-cirrascale",
+    "ai2/jupiter-cirrascale-2",
+])
 parser.add_argument("--is_tuned", action="store_true")
 parser.add_argument("--use_hf_tokenizer_template", action="store_true")
 parser.add_argument("--priority", type=str, default="low")
@@ -91,6 +100,8 @@ parser.add_argument("--upload_to_hf", type=str, default=None, help="If given, up
 parser.add_argument("--hf_upload_experiments", type=str, nargs="*", default=None, help="Upload given experiment to the Hugging Face model hub.")
 parser.add_argument("--run_oe_eval_experiments", action="store_true", help="Run the OE eval tool and experiments too.")
 parser.add_argument("--run_safety_evaluations", action="store_true", help="Run the OE safety evaluations too.")
+parser.add_argument("--skip_oi_evals", action="store_true", help="Don't run open instruct evals.")
+parser.add_argument("--oe_eval_max_length", type=int, default=4096, help="Max length for OE eval.")
 args = parser.parse_args()
 
 
@@ -138,7 +149,7 @@ experiment_groups_default = [
     "mbpp_evalplus_temp_0.1",
     "mbpp_evalplus_temp_0.8",
     "ifeval",
-    "trutufulqa",
+    "truthfulqa",
     "toxigen",
     "xstest",
     "alpaca_eval",
@@ -381,7 +392,7 @@ for experiment_group in experiment_groups:
                 --chat_formatting_function eval.templates.create_prompt_with_tulu_chat_format \
                 --use_vllm \
         '''
-    elif experiment_group == "trutufulqa":
+    elif experiment_group == "truthfulqa":
         task_spec['arguments'][0] = '''
         python -m eval.truthfulqa.run_eval \
             --data_dir /data/truthfulqa \
@@ -517,29 +528,22 @@ for experiment_group in experiment_groups:
             "--chat_formatting_function eval.templates.create_prompt_with_olmo_chat_format")
         ]
 
-    if any([x in model_info[0] for x in ["opt", "pythia", "falcon"]]):
+    if any([x in model_info[0] for x in ["opt", "pythia", "falcon", "olmoe"]]):
         if "--use_vllm" in task_spec['arguments'][0]:
             print(f"Removing --use_vllm for {model_info[0]}")
             task_spec['arguments'] = [task_spec['arguments'][0].replace("--use_vllm", "")] 
 
     # Add additional stop sequences if needed.
     # mainly for llama-3-instruct eot.
-    tasks_without_addition_stop = ["mmlu_0shot", "mmlu_5shot", "trutufulqa"]
+    tasks_without_addition_stop = ["mmlu_0shot", "mmlu_5shot", "truthfulqa"]
     if args.add_stop_sequence and experiment_group not in tasks_without_addition_stop:
         task_spec['arguments'] = [task_spec['arguments'][0] + " --additional_stop_sequence " + " ".join(args.add_stop_sequence)]
 
     # add HF hub upload if specified
     if args.upload_to_hf:
         if args.hf_upload_experiments is None or len(args.hf_upload_experiments) == 0:
-            # use defaults for tulu dev evals.
-            args.hf_upload_experiments = [
-                "MATH_cot",
-                "bbh_cot",
-                "trutufulqa",
-                "xstest",
-                "alpaca_eval",
-                "alpaca_eval_2",
-            ]
+            # by default, we dont upload oi-evals, only safety and oe-evals.
+            args.hf_upload_experiments = []
         if experiment_group not in args.hf_upload_experiments:
             print(f"Skipping HF upload for {experiment_group}")
         else:
@@ -555,19 +559,20 @@ for experiment_group in experiment_groups:
 
 # Create an experiment that runs all the eval tasks.
 
-experiment_name = f"open_instruct_eval_{model_name}_{today}" 
-d["description"] = experiment_name
-d["tasks"] = eval_task_specs
-# if configs/beaker_configs/auto_created doesn't exist, create it with os
-if not os.path.exists("configs/beaker_configs/auto_created"):
-    os.makedirs("configs/beaker_configs/auto_created")
-fn = "configs/beaker_configs/auto_created/{}.yaml".format(experiment_name)
-os.makedirs(os.path.dirname(fn), exist_ok=True)
-with open(fn, "w") as file:
-    yaml.dump(d, file, default_flow_style=True)
+if not args.skip_oi_evals:
+    experiment_name = f"open_instruct_eval_{model_name}_{today}" 
+    d["description"] = experiment_name
+    d["tasks"] = eval_task_specs
+    # if configs/beaker_configs/auto_created doesn't exist, create it with os
+    if not os.path.exists("configs/beaker_configs/auto_created"):
+        os.makedirs("configs/beaker_configs/auto_created")
+    fn = "configs/beaker_configs/auto_created/{}.yaml".format(experiment_name)
+    os.makedirs(os.path.dirname(fn), exist_ok=True)
+    with open(fn, "w") as file:
+        yaml.dump(d, file, default_flow_style=True)
 
-cmd = "beaker experiment create {} --workspace ai2/{}".format(fn, workspace)
-subprocess.Popen(cmd, shell=True)
+    cmd = "beaker experiment create {} --workspace ai2/{}".format(fn, workspace)
+    subprocess.Popen(cmd, shell=True)
 
 if args.run_oe_eval_experiments:
     # if so, run oe-eval. We assume it is cloned in the top-level repo directory.
@@ -579,12 +584,26 @@ if args.run_oe_eval_experiments:
         oe_eval_cmd += f" --model-location {model_info[1]}"
     else:
         oe_eval_cmd += f" --model-location beaker://{model_info[1]}"
+    if args.hf_revision:
+        oe_eval_cmd += f" --revision {args.hf_revision}"
+    # add string with number of gpus
+    num_gpus = task_spec['resources']['gpuCount']
+    # if num_gpus > 1, double it again for oe-eval configs
+    # open_instruct GPT adjustment wasn't quite enough
+    # adjusted here so the GPU configs in open-instruct eval are not impacted by the change
+    # tested reasonably extensively with 70B
+    if num_gpus > 1:
+        num_gpus *= 2
+    oe_eval_cmd += f" --num_gpus {num_gpus}"
+    if args.oe_eval_max_length:
+        oe_eval_cmd += f" --max-length {args.oe_eval_max_length}"
+    print(f"Running OE eval with command: {oe_eval_cmd}")
     subprocess.Popen(oe_eval_cmd, shell=True)
 
 # create an experiment that runs the safety eval tasks
 if args.run_safety_evaluations:
     # just take the original spec we had, modify it for safety eval.
-    experiment_name = f"open_instruct_safety_eval_{model_name}_{today}"
+    experiment_name = f"oi_safety_{model_name}"
     d["description"] = experiment_name
     # specific image for safety eval
     d["tasks"][0]["image"]["beaker"] = "hamishivi/open-safety"
@@ -592,7 +611,7 @@ if args.run_safety_evaluations:
     task_spec = d["tasks"][0]
     task_spec["name"] = experiment_name
     task_spec["arguments"][0] = f'''
-PYTHONPATH=. python evaluation/run_all_generation_benchmarks.py \
+VLLM_WORKER_MULTIPROC_METHOD=spawn PYTHONPATH=. python evaluation/run_all_generation_benchmarks.py \
     --model_name_or_path /model \
     --model_input_template_path_or_name hf \
     --report_output_path /output/metrics.json \
@@ -600,8 +619,8 @@ PYTHONPATH=. python evaluation/run_all_generation_benchmarks.py \
 '''
     # some copied logic
     if model_info[0].startswith("hf-"):  # if it's a huggingface model, load it from the model hub
-        task_spec['arguments'] = [task_spec['arguments'][0].replace("--model_name_or_path /model", "--model_name_or_path "+model_info[1])]
-        task_spec['arguments'] = [task_spec['arguments'][0].replace("--tokenizer_name_or_path /model", "--tokenizer_name_or_path "+model_info[1])]
+        task_spec['arguments'] = [task_spec['arguments'][0].replace("--model_name_or_path /model", f"--model_name_or_path {model_info[1]} --hf_revision {args.hf_revision}")]
+        task_spec['arguments'] = [task_spec['arguments'][0].replace("--tokenizer_name_or_path /model", f"--tokenizer_name_or_path {model_info[1]}")]
     elif model_info[1].startswith("/"):  # if it's a local model, load it from the local directory
         assert nfs_available, "NFS is required for path-based models."  # to be safe.
         task_spec['arguments'] = [task_spec['arguments'][0].replace("--model_name_or_path /model", "--model_name_or_path "+model_info[1])]
@@ -609,12 +628,25 @@ PYTHONPATH=. python evaluation/run_all_generation_benchmarks.py \
     else:  # if it's a beaker model, mount the beaker dataset to `/model`
         task_spec['datasets'][1]['source']['beaker'] = model_info[1]
 
+    task_spec = adjust_gpus(
+        task_spec=task_spec,
+        experiment_group="safety_eval",
+        model_name=model_info[0],
+        gpu_multiplier=args.gpu_multiplier,
+    )
+
+    # add gpu information.
+    # we just assume you want to use all the gpus for one task at a time
+    num_gpus = task_spec['resources']['gpuCount']
+    task_spec["arguments"][0]+= f" --min_gpus_per_task {num_gpus}"
+
     if args.upload_to_hf:
         hf_dataset = args.upload_to_hf
         # to match the way oe-eval script works.
         # if we prepended hf- to the model name, remove it.
-        if model_name.startswith("hf-"):
-            model_name = model_name[3:]
+        # if model_name.startswith("hf-"):
+        #     model_name = model_name[3:]
+        # Above is no longer the case, oe-eval includes hf- again
         task_spec['arguments'] = [task_spec['arguments'][0] + f" --upload_to_hf {hf_dataset} --hf_upload_name results/{model_name}"]
 
     d["tasks"] = [task_spec]
@@ -627,3 +659,4 @@ PYTHONPATH=. python evaluation/run_all_generation_benchmarks.py \
 
     cmd = "beaker experiment create {} --workspace ai2/{}".format(fn, workspace)
     subprocess.Popen(cmd, shell=True)
+    
