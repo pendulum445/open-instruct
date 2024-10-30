@@ -1,3 +1,6 @@
+*.ipynb
+*.json
+*.jsonl
 trash
 rejection_sampling/shards
 rejection_sampling/shards1

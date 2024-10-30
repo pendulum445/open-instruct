@@ -313,7 +313,7 @@ class FlatArguments:
             "help": "Whether to use fused AdamW or not.",
         },
     )
-    push_to_hub: bool = True
+    push_to_hub: bool = False
     """Whether to upload the saved model to huggingface"""
     hf_entity: Optional[str] = None
     """The user or org name of the model repository from the Hugging Face Hub"""
@@ -323,7 +323,7 @@ class FlatArguments:
     """The revision of the saved model in the Hugging Face Hub (can be autoset if not given)"""
     hf_repo_url: Optional[str] = None
     """The url of the saved model in the Hugging Face Hub (will be autoset)"""
-    try_launch_beaker_eval_jobs: bool = True
+    try_launch_beaker_eval_jobs: bool = False
     """Whether to launch beaker evaluation jobs after training"""
     hf_metadata_dataset: Optional[str] = None
     """What dataset to upload the metadata to. If unset, don't upload metadata"""
@@ -847,15 +847,13 @@ def main(args: FlatArguments):
         experiment_config["lr_scheduler_type"] = experiment_config["lr_scheduler_type"]
 
         # (Optional) Ai2 internal tracking
-        if args.wandb_entity is None:
-            args.wandb_entity = maybe_use_ai2_wandb_entity()
-            experiment_config.update(vars(beaker_config))
+        # if args.wandb_entity is None:
+        #     args.wandb_entity = maybe_use_ai2_wandb_entity()
+        #     experiment_config.update(vars(beaker_config))
         accelerator.init_trackers(
             "open_instruct_internal",
-            experiment_config,
-            init_kwargs={"wandb": {"entity": args.wandb_entity, "tags": [args.exp_name] + get_wandb_tags()}},
         )
-        wandb_tracker = accelerator.get_tracker("wandb")
+        # wandb_tracker = accelerator.get_tracker("wandb")
 
     # Train!
     total_batch_size = args.per_device_train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps

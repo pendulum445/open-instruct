@@ -93,7 +93,7 @@ def main(args):
             # we only use stop token for non-chat format (usually applied to vanilla pretrained language models).
             # For chat format, we will rely on the model knows when to stop.
             if not args.use_chat_format:
-                stop_strings += ["\n"]
+                stop_strings += ["\n\n\n"]
             sampling_params = vllm.SamplingParams(
                 temperature=0,
                 max_tokens=args.max_new_tokens,
