@@ -1,5 +1,5 @@
 # Here we use 1 GPU for demonstration, but you can use multiple GPUs and larger eval_batch_size to speed up the evaluation.
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=6
 
 
 # Evaluating llama 7B model, getting the truth and info scores and multiple choice accuracy
@@ -11,15 +11,43 @@ export CUDA_VISIBLE_DEVICES=1
 # The two models provided here are trained based on the llama2 7B model.
 # We have the training details in https://github.com/allenai/truthfulqa_reeval, and verified these two models have similar performance as the original GPT3 judges.
 
-python -m eval.truthfulqa.run_eval \
+models=(
+    Meta-Llama-3-8B-alpaca_lora_merged
+    Meta-Llama-3-8B-alpaca-level-1_lora_merged
+    Meta-Llama-3-8B-alpaca-level-3_lora_merged
+    Meta-Llama-3-8B-alpaca-level-5_lora_merged
+    Meta-Llama-3-8B-alpaca-dpo-level-3-dpo_lora_merged
+    Meta-Llama-3-8B-alpaca-dpo-level-5-dpo_lora_merged
+    # Add more models here
+)
+
+echo "Starting MATH evaluation for the following models:"
+echo "${models[@]}"
+echo "-----------------------------------------------"
+
+# Loop through each model and run evaluation
+for MODEL in "${models[@]}"; do
+    echo "Evaluating model: $MODEL"
+    python -m eval.truthfulqa.run_eval \
     --data_dir data/eval/truthfulqa \
-    --save_dir results/truthfulqa/llama-2-7b-hf \
-    --model_name_or_path output/llama-2-7b-hf \
-    --tokenizer_name_or_path output/llama-2-7b-hf \
+    --save_dir results/truthfulqa/$MODEL \
+    --model_name_or_path output/$MODEL \
+    --tokenizer_name_or_path output/$MODEL \
     --metrics mc \
     --preset qa \
     --eval_batch_size 20 \
     --load_in_8bit
+done
+
+# python -m eval.truthfulqa.run_eval \
+#     --data_dir data/eval/truthfulqa \
+#     --save_dir results/truthfulqa/llama-2-7b-hf \
+#     --model_name_or_path output/llama-2-7b-hf \
+#     --tokenizer_name_or_path output/llama-2-7b-hf \
+#     --metrics mc \
+#     --preset qa \
+#     --eval_batch_size 20 \
+#     --load_in_8bit
 
 
 # # # Evaluating Tulu 7B model using chat format, getting the truth and info scores and multiple choice accuracy

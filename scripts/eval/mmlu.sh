@@ -1,7 +1,34 @@
 # Here we use 1 GPU for demonstration, but you can use multiple GPUs and larger eval_batch_size to speed up the evaluation.
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=5
 
-MODEL=llama-2-7b-hf-alpaca-train-dpo_lora_merged
+models=(
+    Meta-Llama-3-8B-alpaca_lora_merged
+    Meta-Llama-3-8B-alpaca-level-1_lora_merged
+    Meta-Llama-3-8B-alpaca-level-3_lora_merged
+    Meta-Llama-3-8B-alpaca-level-5_lora_merged
+    Meta-Llama-3-8B-alpaca-dpo-level-3-dpo_lora_merged
+    Meta-Llama-3-8B-alpaca-dpo-level-5-dpo_lora_merged
+    # Add more models here
+)
+
+echo "Starting MATH evaluation for the following models:"
+echo "${models[@]}"
+echo "-----------------------------------------------"
+
+# Loop through each model and run evaluation
+for MODEL in "${models[@]}"; do
+    echo "Evaluating model: $MODEL"
+    python -m eval.mmlu.run_eval \
+    --ntrain 5 \
+    --data_dir data/eval/mmlu \
+    --save_dir results/mmlu/$MODEL \
+    --model_name_or_path output/$MODEL \
+    --tokenizer_name_or_path output/$MODEL \
+    --eval_batch_size 4 \
+    --load_in_8bit
+done
+
+
 # Evaluating llama 7B model using 0 shot directly
 # python -m eval.mmlu.run_eval \
 #     --ntrain 0 \
@@ -14,14 +41,14 @@ MODEL=llama-2-7b-hf-alpaca-train-dpo_lora_merged
 
 
 # Evaluating llama 7B model using 5 shot directly
-python -m eval.mmlu.run_eval \
-    --ntrain 5 \
-    --data_dir data/eval/mmlu \
-    --save_dir results/mmlu/$MODEL \
-    --model_name_or_path output/$MODEL \
-    --tokenizer_name_or_path output/$MODEL \
-    --eval_batch_size 4 \
-    --load_in_8bit
+# python -m eval.mmlu.run_eval \
+#     --ntrain 5 \
+#     --data_dir data/eval/mmlu \
+#     --save_dir results/mmlu/$MODEL \
+#     --model_name_or_path output/$MODEL \
+#     --tokenizer_name_or_path output/$MODEL \
+#     --eval_batch_size 4 \
+#     --load_in_8bit
 
 
 # # Evaluating Tulu 7B model using 0 shot and chat format

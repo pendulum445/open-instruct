@@ -1,15 +1,41 @@
 # Here we use 1 GPU for demonstration, but you can use multiple GPUs and larger eval_batch_size to speed up the evaluation.
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=4
+
+models=(
+    Meta-Llama-3-8B-alpaca_lora_merged
+    Meta-Llama-3-8B-alpaca-level-1_lora_merged
+    Meta-Llama-3-8B-alpaca-level-3_lora_merged
+    Meta-Llama-3-8B-alpaca-level-5_lora_merged
+    Meta-Llama-3-8B-alpaca-dpo-level-3-dpo_lora_merged
+    Meta-Llama-3-8B-alpaca-dpo-level-5-dpo_lora_merged
+    # Add more models here
+)
+
+echo "Starting MATH evaluation for the following models:"
+echo "${models[@]}"
+echo "-----------------------------------------------"
+
+# Loop through each model and run evaluation
+for MODEL in "${models[@]}"; do
+    echo "Evaluating model: $MODEL"
+    python -m eval.MATH.run_eval \
+    --data_dir data/eval/MATH/ \
+    --save_dir results/MATH/$MODEL \
+    --model output/$MODEL \
+    --tokenizer output/$MODEL \
+    --n_shot 4 \
+    --use_vllm
+done
 
 
 # Evaluating llama 7B model using chain-of-thought
-python -m eval.MATH.run_eval \
-    --data_dir data/eval/MATH/ \
-    --save_dir results/MATH/llama-2-7b-hf-7b-rewritten-alpaca-train_lora_merged \
-    --model output/llama-2-7b-hf-7b-rewritten-alpaca-train_lora_merged \
-    --tokenizer output/llama-2-7b-hf-7b-rewritten-alpaca-train_lora_merged \
-    --n_shot 4 \
-    --use_vllm
+# python -m eval.MATH.run_eval \
+#     --data_dir data/eval/MATH/ \
+#     --save_dir results/MATH/llama-2-7b-hf-7b-rewritten-alpaca-train_lora_merged \
+#     --model output/llama-2-7b-hf-7b-rewritten-alpaca-train_lora_merged \
+#     --tokenizer output/llama-2-7b-hf-7b-rewritten-alpaca-train_lora_merged \
+#     --n_shot 4 \
+#     --use_vllm
 
 
 # # Evaluating llama 7B model using direct answering (no chain-of-thought)
