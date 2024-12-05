@@ -11,7 +11,7 @@ export CUDA_VISIBLE_DEVICES=$2
 MODEL=Meta-Llama-3-8B
 MODEL_SIZE=8B
 NUM_GPUS=$(echo $CUDA_VISIBLE_DEVICES | tr ',' '\n' | wc -l)
-BATCH_SIZE_PER_GPU=2
+BATCH_SIZE_PER_GPU=4
 TOTAL_BATCH_SIZE=256
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 echo "Training $MODEL using GPUs $CUDA_VISIBLE_DEVICES, $BATCH_SIZE_PER_GPU batch size per GPU, $GRADIENT_ACC_STEPS gradient accumulation steps"
@@ -27,7 +27,7 @@ report_error() {
 # You can also set --gradient_checkpointing or use `stage3_offloading_accelerate.conf` to save memory, 
 # but it will trade off speed.
 accelerate launch \
-    --main_process_port 29500 \
+    --main_process_port 29501 \
     --mixed_precision bf16 \
     --num_machines 1 \
     --num_processes $NUM_GPUS \
@@ -48,7 +48,6 @@ accelerate launch \
     --warmup_ratio 0.03 \
     --weight_decay 0. \
     --num_train_epochs 3 \
-    --checkpointing_steps epoch \
     --output_dir output/$MODEL-$DATASET \
     --logging_steps 1 \
     --report_to "tensorboard" \
@@ -56,13 +55,13 @@ accelerate launch \
 
 bash scripts/report_to_lark.sh "Training $MODEL-$DATASET finished successfully. Begin evaluation."
 
-bash scripts/eval/all.sh $MODEL-$DATASET $CUDA_VISIBLE_DEVICES
+# bash scripts/eval/all.sh $MODEL-$DATASET $CUDA_VISIBLE_DEVICES
 
-bash scripts/report_to_lark.sh "Evaluation of $MODEL-$DATASET finished."
+# bash scripts/report_to_lark.sh "Evaluation of $MODEL-$DATASET finished."
 
-EVAL_RESULTS=$(python show_eval_results.py --models $MODEL-$DATASET) || report_error "Error while fetching evaluation results."
+# EVAL_RESULTS=$(python show_eval_results.py --models $MODEL-$DATASET) || report_error "Error while fetching evaluation results."
 
-echo "Evaluation Results for $MODEL-$DATASET:"
-echo "$EVAL_RESULTS"
+# echo "Evaluation Results for $MODEL-$DATASET:"
+# echo "$EVAL_RESULTS"
 
-bash scripts/report_to_lark.sh "Evaluation results for $MODEL-$DATASET: $EVAL_RESULTS"
+# bash scripts/report_to_lark.sh "Evaluation results for $MODEL-$DATASET: $EVAL_RESULTS"

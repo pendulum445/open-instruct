@@ -3,7 +3,7 @@ import os
 import argparse
 import pandas as pd
 
-results_path = '/mnt/nvme1/lyj/open-instruct/results'
+results_path = 'results'
 dataset_keys = {
     'bbh': ['average_exact_match'],
     'codex_humaneval': ['pass@1', 'pass@5', 'pass@10', 'pass@20'],
