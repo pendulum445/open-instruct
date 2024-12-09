@@ -77,6 +77,7 @@ def main(args):
                 tensor_parallel_size=torch.cuda.device_count(),
                 tokenizer_revision=args.hf_revision,
                 revision=args.hf_revision,
+                max_model_len=4096,
             )
         else:
             print("Loading model and tokenizer with huggingface...")
