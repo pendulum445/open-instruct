@@ -18,7 +18,7 @@ GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 echo "Training $MODEL using GPUs $CUDA_VISIBLE_DEVICES, $BATCH_SIZE_PER_GPU batch size per GPU, $GRADIENT_ACC_STEPS gradient accumulation steps"
 
 # 训练开始上报
-bash scripts/report_to_lark.sh "Training $MODEL-$DATASET is starting using GPUs $CUDA_VISIBLE_DEVICES."
+# bash scripts/report_to_lark.sh "Training $MODEL-$DATASET is starting using GPUs $CUDA_VISIBLE_DEVICES."
 
 # 错误处理函数
 report_error() {
@@ -62,12 +62,12 @@ report_error() {
 
 # Merging LoRA layers
 python open_instruct/merge_lora.py \
-    --base_model_name_or_path /mnt/nvme1/lyj/$MODEL \
-    --lora_model_name_or_path output/$MODEL-$DATASET\_lora/ \
-    --output_dir output/$MODEL-$DATASET\_lora_merged/ \
+    --base_model_name_or_path /data/shared/Qwen2.5-7B \
+    --lora_model_name_or_path /data/lyj/open-instruct/output/train_2024-12-07-13-35-10 \
+    --output_dir /data/lyj/open-instruct/output/Qwen2.5-7B-alpaca \
     --save_tokenizer || report_error "Error during merging LoRA layers."
 
 # 成功完成上报
-bash scripts/report_to_lark.sh "Training $MODEL-$DATASET finished successfully."
+# bash scripts/report_to_lark.sh "Training $MODEL-$DATASET finished successfully."
 
 # bash scripts/eval/all.sh $MODEL-$DATASET\_lora_merged

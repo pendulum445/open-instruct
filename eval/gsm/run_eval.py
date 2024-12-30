@@ -34,7 +34,7 @@ def main(args):
                 "question": example["question"],
                 "answer": example["answer"].split("####")[1].strip()
             })
-        
+
     # some numbers are in the `x,xxx` format, and we want to remove the comma
     for example in test_data:
         example["answer"] = re.sub(r"(\d),(\d)", r"\1\2", example["answer"])
@@ -42,7 +42,7 @@ def main(args):
 
     if args.max_num_examples and len(test_data) > args.max_num_examples:
         test_data = random.sample(test_data, args.max_num_examples)
-        
+
 
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir, exist_ok=True)
@@ -84,11 +84,13 @@ def main(args):
         if args.use_vllm:
             model = vllm.LLM(
                 model=args.model_name_or_path,
-                tokenizer=args.tokenizer_name_or_path if args.tokenizer_name_or_path else args.model_name_or_path,
+                tokenizer=args.tokenizer_name_or_path
+                if args.tokenizer_name_or_path else args.model_name_or_path,
                 tokenizer_mode="slow" if args.use_slow_tokenizer else "auto",
                 tensor_parallel_size=torch.cuda.device_count(),
                 tokenizer_revision=args.hf_revision,
                 revision=args.hf_revision,
+                max_model_len=4096,
             )
             stop_strings = args.additional_stop_sequence
             # we only use stop token for non-chat format (usually applied to vanilla pretrained language models).
@@ -114,7 +116,7 @@ def main(args):
             model = load_hf_lm(
                 model_name_or_path=args.model_name_or_path,
                 revision=args.hf_revision,
-                load_in_8bit=args.load_in_8bit, 
+                load_in_8bit=args.load_in_8bit,
                 device_map="balanced_low_0" if torch.cuda.device_count() > 1 else "auto",
                 gptq_model=args.gptq,
             )
@@ -125,7 +127,7 @@ def main(args):
             if args.use_chat_format:
                 prompts = [apply_chat_format(example, tokenizer) for example in test_data]
             else:
-                prompts = [prompt_prefix + "Question: " + example["question"].strip() + "\nAnswer:" for example in test_data]            
+                prompts = [prompt_prefix + "Question: " + example["question"].strip() + "\nAnswer:" for example in test_data]
             new_line_token = tokenizer.encode("\n", add_special_tokens=False)[-1] # get the last token because the tokenizer may add space tokens at the start.
             stop_tokens = [[new_line_token]]
             stop_tokens += [[tokenizer.encode(stop_seq, add_special_tokens=False)[-1]] for stop_seq in args.additional_stop_sequence]
@@ -164,7 +166,7 @@ def main(args):
             predictions.append(numbers[-1])
         else:
             predictions.append(output)
-        
+
     print("Calculating accuracy...")
     targets = [example["answer"] for example in test_data]
 
@@ -180,8 +182,8 @@ def main(args):
 
     with open(os.path.join(args.save_dir, f"predictions.jsonl"), "w") as fout:
         for prediction in predictions:
-            fout.write(json.dumps(prediction) + "\n") 
-    
+            fout.write(json.dumps(prediction) + "\n")
+
     with open(os.path.join(args.save_dir, "metrics.json"), "w") as fout:
         json.dump({
             "exact_match": em_score
@@ -208,25 +210,25 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--data_dir", 
-        type=str, 
+        "--data_dir",
+        type=str,
         default="data/gsm"
     )
     parser.add_argument(
-        "--max_num_examples", 
-        type=int, 
-        default=None, 
+        "--max_num_examples",
+        type=int,
+        default=None,
         help="maximum number of examples to evaluate."
     )
     parser.add_argument(
-        "--save_dir", 
-        type=str, 
+        "--save_dir",
+        type=str,
         default="results/gsm"
     )
     parser.add_argument(
-        "--model_name_or_path", 
-        type=str, 
-        default=None, 
+        "--model_name_or_path",
+        type=str,
+        default=None,
         help="if specified, we will load the model to generate the predictions."
     )
     parser.add_argument(
@@ -236,9 +238,9 @@ if __name__ == "__main__":
         help="if specified, we will load the model from a revision of the model in the hub"
     )
     parser.add_argument(
-        "--tokenizer_name_or_path", 
-        type=str, 
-        default=None, 
+        "--tokenizer_name_or_path",
+        type=str,
+        default=None,
         help="if specified, we will load the tokenizer from here."
     )
     parser.add_argument(
@@ -247,51 +249,51 @@ if __name__ == "__main__":
         help="If given, we will use the slow tokenizer."
     )
     parser.add_argument(
-        "--openai_engine", 
-        type=str, 
+        "--openai_engine",
+        type=str,
         default=None, help="if specified, we will use the OpenAI API to generate the predictions."
     )
     parser.add_argument(
-        "--n_shot", 
-        type=int, 
-        default=8, 
+        "--n_shot",
+        type=int,
+        default=8,
         help="max number of examples to use for demonstration."
     )
     parser.add_argument(
-        "--no_cot", 
-        action="store_true", 
+        "--no_cot",
+        action="store_true",
         help="If given, we're evaluating a model without chain-of-thought."
     )
     parser.add_argument(
-        "--eval_batch_size", 
-        type=int, 
-        default=1, 
+        "--eval_batch_size",
+        type=int,
+        default=1,
         help="batch size for evaluation."
     )
     parser.add_argument(
-        "--load_in_8bit", 
-        action="store_true", 
+        "--load_in_8bit",
+        action="store_true",
         help="load model in 8bit mode, which will reduce memory and speed up inference."
     )
     parser.add_argument(
-        "--gptq", 
-        action="store_true", 
+        "--gptq",
+        action="store_true",
         help="If given, we're evaluating a 4-bit quantized GPTQ model."
     )
     parser.add_argument(
         "--use_vllm",
-        action="store_true", 
+        action="store_true",
         help="If given, we will use the vllm library, which will likely increase the inference throughput."
     )
     parser.add_argument(
-        "--use_chat_format", 
-        action="store_true", 
+        "--use_chat_format",
+        action="store_true",
         help="If given, we will use the chat format for the prompts."
     )
     parser.add_argument(
-        "--chat_formatting_function", 
-        type=str, 
-        default="eval.templates.create_prompt_with_tulu_chat_format", 
+        "--chat_formatting_function",
+        type=str,
+        default="eval.templates.create_prompt_with_tulu_chat_format",
         help="The function to use to create the chat format. This function will be dynamically imported. Please see examples in `eval/templates.py`."
     )
     parser.add_argument(
