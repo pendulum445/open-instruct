@@ -21,20 +21,20 @@ python -m eval.bbh.run_eval \
     --model_name_or_path $MODEL \
     --use_vllm &&
 
-python -m eval.ifeval.run_eval \
-    --data_dir data/eval/ifeval/ \
-    --save_dir results/ifeval/$MODEL_NAME \
-    --model $MODEL \
-    --tokenizer $MODEL \
-    --use_chat_format \
-    --chat_formatting_function eval.templates.create_prompt_with_tulu_chat_format \
-    --use_vllm &&
+# python -m eval.ifeval.run_eval \
+#     --data_dir data/eval/ifeval/ \
+#     --save_dir results/ifeval/$MODEL_NAME \
+#     --model $MODEL \
+#     --tokenizer $MODEL \
+#     --use_chat_format \
+#     --chat_formatting_function eval.templates.create_prompt_with_tulu_chat_format \
+#     --use_vllm &&
 
 python -m eval.codex_humaneval.run_eval \
     --data_file data/eval/codex_humaneval/HumanEval.jsonl.gz \
     --eval_pass_at_ks 1 5 10 20 \
     --unbiased_sampling_size_n 20 \
-    --temperature 0.0 \
+    --temperature 0.1 \
     --save_dir results/codex_humaneval/$MODEL_NAME \
     --model_name_or_path $MODEL \
     --use_vllm &&
